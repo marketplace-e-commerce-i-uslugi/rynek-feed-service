@@ -2,12 +2,20 @@
 
 `feed-service` — strona główna, Shorts, „Następne”
 
-> Status: **szkielet**. Wszystkie endpointy z tabeli istnieją w kontrolerach (`src/main/java/.../api/`) i zwracają `501 Not Implemented` (RFC 7807). Ciała żądań to puste rekordy w `api/dto/`.
+> Status: **działa** (bez Kafki). Feed składa gotowe dane z search-service (oferty), catalog (kategorie, oferty kanału) i channel (obserwowane), zdarzenia użytkownika zapisuje w PostgreSQL (baza `feed`, Flyway, JWT z JWKS).
+
+- `chips`: Wszystko, Dla Ciebie (po zalogowaniu), kategorie główne z catalog, Usługi, Okazje.
+- `home?chip=`: `all` trafność, `for-you` najnowsze z obejrzanymi na koniec strony, `services` tylko usługi, `deals` od najtańszych (w ofertach nie ma ceny przed obniżką), inne `chip` to id kategorii. Oferty oznaczone „nie interesuje mnie” znikają zalogowanemu. Kursor to kursor search.
+- `shorts`: oferty z filmem (`hasVideo`), bo tiktok-integration jest szkieletem: `video.id` to id oferty, okładka to miniatura, `embedUrl` puste, `viewCount` 0.
+- `following`: najnowsze oferty z do 20 obserwowanych kanałów, na przemian po jednej z kanału (karty nie mają daty), kursor to przesunięcie na połączonej liście (z każdego kanału pobierane tyle, ile trzeba do końca strony). Filmów z kanałów jeszcze nie ma.
+- `related`: inne oferty z kategorii oferty (404 dla nieistniejącej).
+- `events`: `VIEW`, `TAP`, `WATCH_TIME`, `NOT_INTERESTED` (do 50 w żądaniu, 204); gość też może je wysłać, ale bez wpływu na jego feed.
+- Gdy search nie działa, feed zwraca 503, a brak catalog tylko skraca chipy.
 
 ## Uruchomienie
 
 ```bash
-./mvnw spring-boot:run   # port 8086, zmienna PORT
+./mvnw spring-boot:run   # port 8086, zmienna PORT; baza `feed` z rynek-infra/local
 ./mvnw verify            # testy
 ```
 

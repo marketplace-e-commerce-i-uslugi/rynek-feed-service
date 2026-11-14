@@ -4,6 +4,31 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  datasource:
+    # Lokalnie: rynek-infra/local (docker compose). Inne środowiska ustawiają zmienne.
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/feed}
+    username: ${DB_USER:feed}
+    password: ${DB_PASSWORD:feed}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+
+rynek:
+  # Feed składa gotowe dane z innych serwisów (bez Kafki): oferty z search, kategorie i oferty kanału z catalog, obserwowane z channel.
+  search:
+    url: ${SEARCH_SERVICE_URL:http://localhost:8087}
+  catalog:
+    url: ${CATALOG_SERVICE_URL:http://localhost:8083}
+  channel:
+    url: ${CHANNEL_SERVICE_URL:http://localhost:8082}
+  feed:
+    page-size: 20
+    # „Obserwowane”: lista składana z najnowszych ofert tylu kanałów.
+    following-max-channels: 20
+  jwt:
+    jwk-set-uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}/internal/auth/jwks
+    issuer: ${JWT_ISSUER:rynek-identity}
 
 server:
   port: ${PORT:8086}
