@@ -113,6 +113,21 @@ class FeedFlowTests {
     }
 
     @Test
+    void ukryteOfertyDopelniajaStroneKolejnaPorcjaZSearch() throws Exception {
+        UUID user = UUID.randomUUID();
+        String auth = bearer(user);
+        mvc.perform(post("/api/v1/feed/events").header(HttpHeaders.AUTHORIZATION, auth).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"events\":[{\"type\":\"NOT_INTERESTED\",\"offerId\":\"" + A + "\"}]}")).andExpect(status().isNoContent());
+        given(search.offers(any(), any(), any(), any(), eq((String) null))).willReturn(page("p2", A, B));
+        given(search.offers(any(), any(), any(), any(), eq("p2"))).willReturn(page("p3", C));
+        given(search.offers(any(), any(), any(), any(), eq("p3"))).willReturn(page(null));
+        // Page-size w testach to 20, więc po ukryciu A dobieramy p2 i p3, aż skończą się oferty.
+        mvc.perform(get("/api/v1/feed/home").header(HttpHeaders.AUTHORIZATION, auth))
+                .andExpect(jsonPath("$.items[*].offer.id", contains(B.toString(), C.toString())))
+                .andExpect(jsonPath("$.nextCursor", nullValue()));
+    }
+
+    @Test
     void zdarzeniaGoscia_walidacja() throws Exception {
         mvc.perform(post("/api/v1/feed/events").contentType(MediaType.APPLICATION_JSON).content("{\"events\":[{\"type\":\"TAP\",\"offerId\":\"" + A + "\"}]}"))
                 .andExpect(status().isNoContent());

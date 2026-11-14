@@ -29,6 +29,9 @@ import tools.jackson.databind.JsonNode;
 @Service
 public class FeedService {
 
+    /** Ile razy najwyżej dobieramy porcje z search, gdy ukryte oferty skracają stronę. */
+    private static final int MAX_REFILLS = 5;
+
     private final SearchClient search;
     private final CatalogClient catalog;
     private final ChannelClient channels;
@@ -82,19 +85,27 @@ public class FeedService {
             case "deals" -> sort = "price_asc";
             default -> category = id;
         }
-        JsonNode result = search.offers(category, type, sort, null, cursor);
         Set<UUID> hidden = events.hidden(viewer);
         List<JsonNode> cards = new ArrayList<>();
-        for (JsonNode card : result.path("items")) {
-            if (!hidden.contains(idOf(card))) {
-                cards.add(card);
+        String next = cursor;
+        // Ukryte oferty wypadają ze strony, więc dobieramy kolejne porcje z search, aż strona się zapełni (albo skończą się oferty).
+        for (int fetches = 0; fetches < MAX_REFILLS; fetches++) {
+            JsonNode result = search.offers(category, type, sort, null, next);
+            for (JsonNode card : result.path("items")) {
+                if (!hidden.contains(idOf(card))) {
+                    cards.add(card);
+                }
+            }
+            next = cursorOf(result);
+            if (next == null || cards.size() >= pageSize || hidden.isEmpty()) {
+                break;
             }
         }
         if (id.equals("for-you")) {
             Set<UUID> seen = events.seen(viewer);
             cards.sort(Comparator.comparingInt(c -> seen.contains(idOf(c)) ? 1 : 0));
         }
-        return new Page<>(cards.stream().map(Item::of).toList(), cursorOf(result));
+        return new Page<>(cards.stream().map(Item::of).toList(), next);
     }
 
     /**
