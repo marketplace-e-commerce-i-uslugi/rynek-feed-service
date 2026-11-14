@@ -15,13 +15,15 @@ spring:
       ddl-auto: validate
 
 rynek:
-  # Feed składa gotowe dane z innych serwisów (bez Kafki): oferty z search, kategorie i oferty kanału z catalog, obserwowane z channel.
+  # Feed składa gotowe dane z innych serwisów (bez Kafki): oferty z search, kategorie, karty i oferty kanału z catalog, obserwowane z channel, filmy z tiktok.
   search:
     url: ${SEARCH_SERVICE_URL:http://localhost:8087}
   catalog:
     url: ${CATALOG_SERVICE_URL:http://localhost:8083}
   channel:
     url: ${CHANNEL_SERVICE_URL:http://localhost:8082}
+  tiktok:
+    url: ${TIKTOK_SERVICE_URL:http://localhost:8085}
   feed:
     page-size: 20
     # „Obserwowane”: lista składana z najnowszych ofert tylu kanałów.

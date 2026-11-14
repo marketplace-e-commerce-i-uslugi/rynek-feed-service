@@ -36,6 +36,7 @@ import pl.rynek.feed.TestcontainersConfig;
 import pl.rynek.feed.sync.CatalogClient;
 import pl.rynek.feed.sync.ChannelClient;
 import pl.rynek.feed.sync.SearchClient;
+import pl.rynek.feed.sync.TiktokClient;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -55,6 +56,7 @@ class FeedFlowTests {
     @MockitoBean SearchClient search;
     @MockitoBean CatalogClient catalog;
     @MockitoBean ChannelClient channels;
+    @MockitoBean TiktokClient tiktok;
 
     @BeforeEach
     void setUp() {
@@ -140,17 +142,32 @@ class FeedFlowTests {
     }
 
     @Test
-    void shortsToOfertyZFilmem() throws Exception {
-        given(search.offers(null, null, "newest", true, null)).willReturn(page("kursor2", A));
+    void shortsToFilmyZTiktokZKartamiOfert_filmBezOpublikowanejOfertyNieMaKarty() throws Exception {
+        given(tiktok.shorts(null)).willReturn(json.readTree("{\"items\":["
+                + "{\"id\":\"v1\",\"title\":\"Film A\",\"embedUrl\":\"/api/v1/tiktok/sandbox/player/x\",\"durationSec\":24,\"vertical\":true,\"viewCount\":5,\"offerId\":\"" + A + "\"},"
+                + "{\"id\":\"v2\",\"title\":\"Film B\",\"vertical\":true,\"viewCount\":0,\"offerId\":\"" + B + "\"},"
+                + "{\"id\":\"v3\",\"title\":\"Film C\",\"vertical\":true,\"viewCount\":0,\"offerId\":null}],\"nextCursor\":\"8\"}"));
+        // Karty zwraca tylko opublikowana oferta A; B (szkic albo wstrzymana) nie ma karty.
+        given(catalog.offersBatch(A + "," + B)).willReturn(json.readTree("[{\"id\":\"" + A + "\",\"title\":\"Oferta A\"}]"));
         mvc.perform(get("/api/v1/feed/shorts")).andExpect(status().isOk())
-                .andExpect(jsonPath("$.items", hasSize(1)))
-                .andExpect(jsonPath("$.items[0].video.id", is(A.toString())))
-                .andExpect(jsonPath("$.items[0].video.title", is("Oferta " + A)))
-                .andExpect(jsonPath("$.items[0].video.vertical", is(true)))
-                .andExpect(jsonPath("$.items[0].video.offerId", is(A.toString())))
-                .andExpect(jsonPath("$.items[0].video.channel.name", is("Sklep")))
+                .andExpect(jsonPath("$.items", hasSize(3)))
+                .andExpect(jsonPath("$.items[0].video.id", is("v1")))
+                .andExpect(jsonPath("$.items[0].video.embedUrl", is("/api/v1/tiktok/sandbox/player/x")))
                 .andExpect(jsonPath("$.items[0].offer.id", is(A.toString())))
-                .andExpect(jsonPath("$.nextCursor", is("kursor2")));
+                .andExpect(jsonPath("$.items[1].video.id", is("v2")))
+                .andExpect(jsonPath("$.items[1].offer", nullValue()))
+                .andExpect(jsonPath("$.items[2].offer", nullValue()))
+                .andExpect(jsonPath("$.nextCursor", is("8")));
+        given(tiktok.shorts("8")).willReturn(json.readTree("{\"items\":[],\"nextCursor\":null}"));
+        mvc.perform(get("/api/v1/feed/shorts").param("cursor", "8")).andExpect(status().isOk());
+        org.mockito.Mockito.verify(tiktok).shorts("8");
+    }
+
+    @Test
+    void shortsBezFilmowToPustaLista_bezPytaniaOKarty() throws Exception {
+        given(tiktok.shorts(null)).willReturn(json.readTree("{\"items\":[],\"nextCursor\":null}"));
+        mvc.perform(get("/api/v1/feed/shorts")).andExpect(status().isOk()).andExpect(jsonPath("$.items", hasSize(0))).andExpect(jsonPath("$.nextCursor", nullValue()));
+        org.mockito.Mockito.verify(catalog, org.mockito.Mockito.never()).offersBatch(anyString());
     }
 
     @Test

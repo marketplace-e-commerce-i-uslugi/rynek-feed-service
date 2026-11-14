@@ -24,6 +24,11 @@ public class CatalogClient {
         return http.get().uri("/api/v1/offers/{id}", offerId).retrieve().body(JsonNode.class);
     }
 
+    /** Karty ofert po id (opublikowane); brakujące i szkice są pomijane. */
+    public JsonNode offersBatch(String ids) {
+        return http.get().uri(uri -> uri.path("/api/v1/offers/batch").queryParam("ids", ids).build()).retrieve().body(JsonNode.class);
+    }
+
     /** Strona najnowszych ofert kanału (karty): {@code items}, {@code nextCursor}. Limit najwyżej 50 (tyle przyjmuje catalog). */
     public JsonNode channelOffers(String channelId, int limit, String cursor) {
         return http.get().uri(uri -> {

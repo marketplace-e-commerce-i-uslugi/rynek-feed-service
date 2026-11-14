@@ -2,7 +2,9 @@ package pl.rynek.feed.feed;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -16,10 +18,10 @@ import pl.rynek.feed.feed.FeedDtos.Chip;
 import pl.rynek.feed.feed.FeedDtos.Item;
 import pl.rynek.feed.feed.FeedDtos.Page;
 import pl.rynek.feed.feed.FeedDtos.ShortItem;
-import pl.rynek.feed.feed.FeedDtos.Video;
 import pl.rynek.feed.sync.CatalogClient;
 import pl.rynek.feed.sync.ChannelClient;
 import pl.rynek.feed.sync.SearchClient;
+import pl.rynek.feed.sync.TiktokClient;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -35,16 +37,18 @@ public class FeedService {
     private final SearchClient search;
     private final CatalogClient catalog;
     private final ChannelClient channels;
+    private final TiktokClient tiktok;
     private final EventService events;
     private final int pageSize;
     private final int followingMaxChannels;
 
-    public FeedService(SearchClient search, CatalogClient catalog, ChannelClient channels, EventService events,
+    public FeedService(SearchClient search, CatalogClient catalog, ChannelClient channels, TiktokClient tiktok, EventService events,
                        @Value("${rynek.feed.page-size}") int pageSize,
                        @Value("${rynek.feed.following-max-channels}") int followingMaxChannels) {
         this.search = search;
         this.catalog = catalog;
         this.channels = channels;
+        this.tiktok = tiktok;
         this.events = events;
         this.pageSize = pageSize;
         this.followingMaxChannels = followingMaxChannels;
@@ -146,17 +150,34 @@ public class FeedService {
         return new Page<>(items, end < merged.size() || channelHasMore ? String.valueOf(end) : null);
     }
 
-    /** Oferty z filmem jako Shorts. Filmów jeszcze nie serwuje tiktok-integration, więc film opisuje oferta (okładka = miniatura). */
+    /**
+     * Shorts: pionowe filmy z tiktok-integration z kartami ich ofert (jedno zapytanie o karty na stronę). Film, którego oferta nie jest
+     * opublikowana, nie ma karty, więc w Shorts nie ma przy nim „Kup teraz”.
+     */
     public Page<ShortItem> shorts(String cursor) {
-        JsonNode result = search.offers(null, null, "newest", true, cursor);
+        JsonNode result = tiktok.shorts(cursor);
+        String offerIds = String.join(",", offerIdsOf(result.path("items")));
+        Map<String, JsonNode> offers = new HashMap<>();
+        if (!offerIds.isEmpty()) {
+            catalog.offersBatch(offerIds).forEach(card -> offers.put(card.path("id").asString(), card));
+        }
         List<ShortItem> items = new ArrayList<>();
-        for (JsonNode card : result.path("items")) {
-            String id = card.path("id").asString();
-            Video video = new Video(id, card.path("title").asString(), null, card.path("thumbnailUrl").asString(null),
-                    card.path("videoDurationSec").asInt(0), true, 0, false, id, card.path("channel"), card.path("tone").asInt(1));
-            items.add(new ShortItem(video, card));
+        for (JsonNode video : result.path("items")) {
+            JsonNode offerId = video.path("offerId");
+            items.add(new ShortItem(video, offerId.isNull() || offerId.isMissingNode() ? null : offers.get(offerId.asString())));
         }
         return new Page<>(items, cursorOf(result));
+    }
+
+    private static List<String> offerIdsOf(JsonNode videos) {
+        List<String> ids = new ArrayList<>();
+        for (JsonNode video : videos) {
+            JsonNode offerId = video.path("offerId");
+            if (!offerId.isNull() && !offerId.isMissingNode()) {
+                ids.add(offerId.asString());
+            }
+        }
+        return ids;
     }
 
     /** „Następne” obok oferty: inne oferty z jej kategorii. Nieistniejąca oferta daje 404. */

@@ -30,11 +30,8 @@ public final class FeedDtos {
         }
     }
 
-    public record Video(String id, String title, String embedUrl, String coverUrl, int durationSec, boolean vertical, long viewCount,
-                        boolean captions, String offerId, JsonNode channel, int tone) {
-    }
-
-    public record ShortItem(Video video, JsonNode offer) {
+    /** {@code video} to {@code Video} z tiktok-integration bez zmian; {@code offer} to karta oferty filmu albo {@code null}. */
+    public record ShortItem(JsonNode video, JsonNode offer) {
     }
 
     public record EventRequest(
