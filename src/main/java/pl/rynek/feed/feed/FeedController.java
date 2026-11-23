@@ -57,8 +57,8 @@ public class FeedController {
      * Strumień pionowych filmów z powiązanymi ofertami. Dostęp: pub.
      */
     @GetMapping("/api/v1/feed/shorts")
-    public Page<ShortItem> getShortsFeed(@RequestParam(required = false) String cursor) {
-        return feed.shorts(cursor);
+    public Page<ShortItem> getShortsFeed(HttpServletRequest request, @RequestParam(required = false) String cursor) {
+        return feed.shorts(cursor, viewer.of(request));
     }
 
     /**

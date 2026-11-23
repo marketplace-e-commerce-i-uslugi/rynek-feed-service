@@ -164,6 +164,22 @@ class FeedFlowTests {
     }
 
     @Test
+    void shortsUkrywajaFilmyOfertyOznaczonejJakoNieInteresujeMnie() throws Exception {
+        UUID user = UUID.randomUUID();
+        String auth = bearer(user);
+        mvc.perform(post("/api/v1/feed/events").header(HttpHeaders.AUTHORIZATION, auth).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"events\":[{\"type\":\"NOT_INTERESTED\",\"offerId\":\"" + A + "\"}]}")).andExpect(status().isNoContent());
+        given(tiktok.shorts(null)).willReturn(json.readTree("{\"items\":["
+                + "{\"id\":\"v1\",\"title\":\"Film A\",\"vertical\":true,\"viewCount\":5,\"offerId\":\"" + A + "\"},"
+                + "{\"id\":\"v2\",\"title\":\"Film B\",\"vertical\":true,\"viewCount\":0,\"offerId\":\"" + B + "\"}],\"nextCursor\":null}"));
+        given(catalog.offersBatch(A + "," + B)).willReturn(json.readTree("[{\"id\":\"" + A + "\",\"title\":\"Oferta A\"},{\"id\":\"" + B + "\",\"title\":\"Oferta B\"}]"));
+        // Zalogowany ukrywa film oferty A; gość nadal widzi oba.
+        mvc.perform(get("/api/v1/feed/shorts").header(HttpHeaders.AUTHORIZATION, auth)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(1))).andExpect(jsonPath("$.items[0].video.id", is("v2")));
+        mvc.perform(get("/api/v1/feed/shorts")).andExpect(jsonPath("$.items", hasSize(2)));
+    }
+
+    @Test
     void shortsBezFilmowToPustaLista_bezPytaniaOKarty() throws Exception {
         given(tiktok.shorts(null)).willReturn(json.readTree("{\"items\":[],\"nextCursor\":null}"));
         mvc.perform(get("/api/v1/feed/shorts")).andExpect(status().isOk()).andExpect(jsonPath("$.items", hasSize(0))).andExpect(jsonPath("$.nextCursor", nullValue()));

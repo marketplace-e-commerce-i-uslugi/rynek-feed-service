@@ -152,10 +152,12 @@ public class FeedService {
 
     /**
      * Shorts: pionowe filmy z tiktok-integration z kartami ich ofert (jedno zapytanie o karty na stronę). Film, którego oferta nie jest
-     * opublikowana, nie ma karty, więc w Shorts nie ma przy nim „Kup teraz”.
+     * opublikowana, nie ma karty, więc w Shorts nie ma przy nim „Kup teraz”. Zalogowanemu nie pokazujemy filmów ofert, które oznaczył jako
+     * „Nie interesuje mnie” (strona może przez to mieć mniej filmów).
      */
-    public Page<ShortItem> shorts(String cursor) {
+    public Page<ShortItem> shorts(String cursor, Optional<UUID> viewer) {
         JsonNode result = tiktok.shorts(cursor);
+        Set<UUID> hidden = events.hidden(viewer);
         String offerIds = String.join(",", offerIdsOf(result.path("items")));
         Map<String, JsonNode> offers = new HashMap<>();
         if (!offerIds.isEmpty()) {
@@ -164,6 +166,9 @@ public class FeedService {
         List<ShortItem> items = new ArrayList<>();
         for (JsonNode video : result.path("items")) {
             JsonNode offerId = video.path("offerId");
+            if (!hidden.isEmpty() && !offerId.isNull() && !offerId.isMissingNode() && hidden.contains(UUID.fromString(offerId.asString()))) {
+                continue;
+            }
             items.add(new ShortItem(video, offerId.isNull() || offerId.isMissingNode() ? null : offers.get(offerId.asString())));
         }
         return new Page<>(items, cursorOf(result));
